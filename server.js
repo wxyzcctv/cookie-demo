@@ -2,10 +2,15 @@ var http = require('http')
 var fs = require('fs')
 var url = require('url')
 var port = process.argv[2]
+var md5 = require('md5');
 
 if(!port){
   console.log('请指定端口号好不啦？\nnode server.js 8888 这样不会吗？')
   process.exit(1)
+}
+
+let sessions = {
+
 }
 
 var server = http.createServer(function(request, response){
@@ -21,9 +26,30 @@ var server = http.createServer(function(request, response){
 
   console.log('方方说：含查询字符串的路径\n' + pathWithQuery)
 
-  if(path === '/'){
+  if(path === '/js/main.js'){
+    let string = fs.readFileSync('./js/main.js','utf8')
+    response.setHeader('Content-Type', 'application/javascript;charset=utf-8')
+    let fileMd5 = md5(string)
+    response.setHeader('ETag', fileMd5)
+    if(request.headers['if-none-match'] === fileMd5){
+      response.statusCode = 304
+      // 表示没有改变，这里就没有响应体
+    }else{//如果已经发生改变了就请求下面的这些东西
+      response.write(string)
+    }
+    response.end()
+  }else if(path === '/css/default.css'){
+    let string = fs.readFileSync('./css/default.css','utf8')
+    response.setHeader('Content-Type','text/css;charset=utf-8')
+    response.setHeader('Cache-Control', 'max-age=30')
+    response.write(string)
+    response.end()
+  }else if(path === '/'){
     let string = fs.readFileSync('./index.html','utf8')
-    let cookies = request.headers.cookie.split('; ')
+    let cookies = ''
+    if(request.headers.cookie){
+      cookies = request.headers.cookie.split('; ')
+    }
     //获得响应头，将响应头中的cookie单独拿出来进行分裂。那么将会出现如下事例结果
     //['email=1@qqc.om', 'a=1', 'b=2']
     let hash = {}
@@ -33,7 +59,14 @@ var server = http.createServer(function(request, response){
       let value = parts[1]
       hash[key] = value
     }
-    let email = hash.sign_in_email // 这个时候是得到的是cookie中的email，
+    //此处的hash列表中的数组中的key已经变为了随机数字sessionId
+    let mySession = sessions[hash.sessionId]
+    console.log(mySession)
+    let email
+    if(mySession){
+      email = mySession.sign_in_email
+    }
+    // 这个时候是得到的是cookie中的email，
     let users = fs.readFileSync('./db/users','utf8')
     users = JSON.parse(users)  // 得到了数据文件中的字符串之后需要转换为JSON格式才能进行后面的操作
     let foundUser
@@ -156,7 +189,11 @@ var server = http.createServer(function(request, response){
           }
         }
         if(found){
-          response.setHeader('Set-Cookie',`sign_in_email=${email}`)
+          let sessionId = Math.random()*100000
+          sessions[sessionId] = {sign_in_email: email}
+          //如果注册成功就用一个随机数组来代替这个邮箱，将这个随机数组与这个邮箱进行关联之后，
+          //返回一个cookie时，显示的内容就是代表用户邮箱的随机数组
+          response.setHeader('Set-Cookie',`sessionId=${sessionId}`)
           // 设置一个Cookie的标记，这Cookie标记是在登陆成功的时候出现的，此处设置的是登陆的email
           // 加上HttpOnly之后浏览器就不能通过JS去改动，可以手动改动
           response.statusCode = 200
