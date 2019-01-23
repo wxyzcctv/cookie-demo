@@ -193,7 +193,7 @@ var server = http.createServer(function(request, response){
           sessions[sessionId] = {sign_in_email: email}
           //如果注册成功就用一个随机数组来代替这个邮箱，将这个随机数组与这个邮箱进行关联之后，
           //返回一个cookie时，显示的内容就是代表用户邮箱的随机数组
-          response.setHeader('Set-Cookie',`sessionId=${sessionId}`)
+          response.setHeader('Set-Cookie',`sessionId=${sessionId};Max-Age=5`)
           // 设置一个Cookie的标记，这Cookie标记是在登陆成功的时候出现的，此处设置的是登陆的email
           // 加上HttpOnly之后浏览器就不能通过JS去改动，可以手动改动
           response.statusCode = 200
